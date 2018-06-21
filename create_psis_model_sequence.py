@@ -1,3 +1,5 @@
+"""Direct script to build a PSI prediction model. It is better to use the general script
+build_psi_models.py insteead."""
 import pandas
 from sklearn.preprocessing import normalize
 print('reading data')

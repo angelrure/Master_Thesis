@@ -4,6 +4,9 @@ print('reading data')
 data = pandas.read_table('general_correct_psis_exons_200.txt', index_col = 0, sep = ',', nrows = 40000) # general_correct_psis_exons_200.txt, muscle_psis_exons_200
 conservation = pandas.read_table('conservation_scores_per_position_per_exon_200_40_40_200', sep = '\t', index_col = 0)
 
+"""Direct script to build a PSI prediction model using the sequence and conservation values.
+It is better to use build_psi_models.py script instead."""
+
 ##-----
 exon_len = 80 # CHANGE EVERY TIME.
 intron_len = 200 # CHANGE EVERY TIME.
