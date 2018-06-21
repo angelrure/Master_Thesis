@@ -1,24 +1,17 @@
 import pandas
 import matplotlib.pyplot as plt
-from sklearn.metrics import roc_curve
-from sklearn.metrics import auc
-from sklearn.metrics import average_precision_score
-from sklearn.metrics import precision_recall_curve
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_curve, auc, average_precision_score, precision_recall_curve, accuracy_score, confusion_matrix
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+import numpy as np
+import itertools
+
+# This provides several handy functions used.
+
 
 def analyze_posterior_binary_classifier(probs, labels, model_name = 'Random Forest'):
 	"""Given a model, a data and the labels of the data, predicts how well the prediction 
 	probabilities are.""" 
-	""" working on that
-	global temporal_info, accuracies
-	data = pandas.DataFrame(probs, columns = ['probs'], index = labels.index)
-	data['labels'] = labels
-	accuracies = {}
-	for i in range(50,101, 1):
-		temporal_info = data[data['probs']>=i/100]
-		accuracies[i] = accuracy_score(data['probs'].round(), data['labels'])
-	return accuracies
-	"""
 	if len(labels.unique()) == 2:
 		information = pandas.DataFrame(index = labels.index)
 		information['label'] = labels
@@ -85,6 +78,38 @@ def perform_prc_curve(labels, scores, reason = ''):
 	plt.legend(fontsize = 20, loc = 4)
 	plt.show()
 
+def perform_confusion_matrix(y_predicted, y_true):
+	"""Performs a confusion matrix given a set of predicted and true labels."""
+	numbers_to_tissues = {x:y for x,y in zip(range(len(y_true.columns.unique())),y_true.columns.unique())}
+	predictions = [numbers_to_tissues[x] for x in y_predicted]
+	real = y_true.idxmax(1)
+	return (confusion_matrix(real, predictions))
+
+def plot_confusion_matrix(cm, classes,
+                          normalize=False,
+                          title='Confusion matrix',
+                          cmap=plt.cm.Blues):
+    """Plots a confusion matrix object.
+    -classes: names of the classes to use, if not given it is inferred from the cm.
+    -normalize: whether to normalize the values from the confusion matrix by class.
+    -cmap: color map object to use to color the matrix."""
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+    print(cm)
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=90)
+    plt.yticks(tick_marks, classes)
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.show()
+
 def plot_results_from_several_file(common_name):
 	"""Takes a set of files with a common name and plots them together. Example: results_method1, results_method2, etc."""
 	list_of_files = [x for x in os.listdir() if common_name in x]
@@ -107,17 +132,22 @@ def plot_results_from_several_file(common_name):
 
 
 def perform_pca(data, n_components):
+	"""Performs a simple pca"""
 	pca = PCA(n_components = 100)
 	pca.fit(data)
 	data = pandas.DataFrame(pca.transform(data), index = data.index)
 	return data
 
 def perform_leave_on_out(data):
+	"""Performs a simple leave one out method"""
 	loo = LeaveOneOut()
 	loo = loo.split(data)
 	return loo
 
 def data_parser(data, reference, outfile):
+	"""Parses a data using a reference.
+	-reference: reference to parse the data.
+	-outfile: where to store the parsed data"""
 	reference = reference.sort_index()
 	parsed = pandas.DataFrame(index = data.index)
 	max_length = len(reference.index.unique())
@@ -133,9 +163,20 @@ def data_parser(data, reference, outfile):
 			continue
 	parsed.to_csv(outfile)
 
+def analyze_pca_results_labels(data, pca, labels):
+	"""Plots the labels of a data within the first two dimensions of a PCA."""
+	tags = labels.idxmax(1)
+	transformed_data = pandas.DataFrame(pca.transform(data),index = data.index)
+	for tissue in tags.unique():
+		plt.scatter(transformed_data.loc[tags[tags == tissue].index][0], 
+			transformed_data.loc[tags[tags == tissue].index][1], label = tissue)
+	plt.legend()
+	plt.show()
+
 ## CONCRETE WORKLINES
 
 def TCGA_isoTPM_to_geneTPM():
+	"""Parses data from TCGA"""
 	data = pandas.read_table('/genomics/users/aruiz/TCGA/TcgaTargetGtex_rsem_isoform_tpm', 
 		index_col = 0)
 	data = data.transpose()
@@ -143,3 +184,37 @@ def TCGA_isoTPM_to_geneTPM():
 	data = 2**(data-0.001)
 	reference = pandas.read_table('transcripts_per_gente.txt', index_col = 0)
 	data_parser(data, reference, '/genomics/users/aruiz/TCGA/TcgaTargetGtex_gene_isoform_tpm')
+
+### Fix paper
+
+def analyze_tissue_pca_similarity(data, labels, pca, tissues):
+	"""To study whether the tissues that were worstly predicted present similar
+	splicing patterns."""
+	tags = labels.idxmax(1)
+	data = data[tags.isin(['Breast','Salivary Gland', 'Uterus', 'Vagina', 'Pancreas', 'Spleen'])]
+	labels = labels[tags.isin(['Breast','Salivary Gland', 'Uterus', 'Vagina', 'Pancreas', 'Spleen'])]
+	analyze_pca_results_labels(data, pca, labels)
+
+def analyze_tissue_tsne_similarity(data, labels, ignore_tissues = ['Breast','Salivary Gland', 'Uterus', 'Vagina', 'Pancreas', 'Spleen']):
+	"""To study whether the tissues that were worstly predicted present similar
+	splicing patterns.
+	-ignore tissues: tissues to avoid plot.
+	"""
+	tags = labels.idxmax(1)
+	data = data[~tags.isin(ignore_tissues)]
+	labels = tags[~tags.isin(ignore_tissues)]
+	pca = PCA(n_components = 100)
+	pca.fit(data)
+	print(pca.explained_variance_ratio_.sum())
+	transformed_data = pandas.DataFrame(pca.transform(data),index = data.index)
+	tsne = TSNE(method = 'exact')
+	transformed_data =  pandas.DataFrame(tsne.fit_transform(X = transformed_data),index = transformed_data.index)
+	for tissue in labels.unique():
+		print(tissue)
+		tissue_transformed_data = transformed_data[labels == tissue]
+		plt.scatter(tissue_transformed_data[0], tissue_transformed_data[1], label = tissue)
+	plt.legend()
+	plt.xticks(fontsize = 20)
+	plt.yticks(fontsize = 20)
+	plt.title(str(len(ignore_tissues)) + ' worse predicted tissues t-SNE', fontsize = 20)
+	plt.show()

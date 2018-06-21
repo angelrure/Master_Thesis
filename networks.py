@@ -7,9 +7,24 @@ import build_vcf_models as bm
 from keras.layers import LSTM
 from keras.layers.embeddings import Embedding
 
+### This script contains functions used in other scripts for the
+### easy creation of neural netowrks.
+
 def plain_NN(input_shape, output_shape, n_layers, n_nodes, step_activation = 'relu',
 	final_activation = 'sigmoid',optimizer = False, kind_of_model = 'classification', 
-	halve_each_layer = False,dropout = False):
+	halve_each_layer = False,dropout = False, learning_rate = 0.0001):
+	"""  Creates a simple neural network model
+	-input_shape = integer that represents the number of features used by the model.
+	-output_shape = integer that represents the number of features the model tries to predict.
+	-n_layers = the number of layers in the model.
+	-n_nodes = the number of nodes in each layer.
+	-step_activation = activation function at each step, can be any that keras uses.
+	-final_activation = activation function at the final step, can be any that keras uses.
+	-optimizers = if provided, it uses the optimizers delivered.
+	-halve each layer = if true, each layer has half the nodes as the previous one.
+	-dropout = use drouput layers.
+	-learning_rate = the learning rate for the model to learn. 
+	"""
 	model = Sequential()
 	model.add(Dense(n_nodes, activation='relu', input_dim=input_shape))
 	if halve_each_layer:
@@ -28,7 +43,7 @@ def plain_NN(input_shape, output_shape, n_layers, n_nodes, step_activation = 're
 	if optimizer:
 		optimizer = optimizer
 	else:
-		optimizer = optimizers.RMSprop()
+		optimizer = optimizers.RMSprop(lr = learning_rate)
 	if kind_of_model == 'classification':
 		model.compile(optimizer = optimizer, loss = 'binary_crossentropy', metrics = ['accuracy'])
 	if kind_of_model == 'regression':
@@ -36,6 +51,8 @@ def plain_NN(input_shape, output_shape, n_layers, n_nodes, step_activation = 're
 	return model
 
 def simple_autoencoder(data, n_dimensions, epochs = 1000, learning_rate = 0.0001):
+	""" Creates a simple autoencoder
+	-n_dimensions = number of dimensions to use."""
 	encoding_dims = n_dimensions
 	input_data = Input(shape=(data.shape[1],))
 	encoded = Dense(encoding_dims, activation = 'relu')(input_data)
@@ -51,6 +68,9 @@ def simple_autoencoder(data, n_dimensions, epochs = 1000, learning_rate = 0.0001
 	return encoder, autoencoder, history
 
 def fit_network(model, data, labels, epochs = 100, batch_size = 32,checkpointer = False):
+	"""Fits a neural network into a model and returns the history to easily analyze the performance.
+	checkpointer: if given a name, creates a checkpointer with that name.
+	"""
 	X_train, y_train, X_CV, y_CV, X_test,y_test = generate_sets(data, labels)
 	if checkpointer:
 		model_file = 'saved_models/' + checkpointer
@@ -68,6 +88,10 @@ def fit_network(model, data, labels, epochs = 100, batch_size = 32,checkpointer 
 	return history
 
 def generate_sets(data, labels, norm = False, do_not_split = False):
+	"""Generate sets for the training, validating and testing
+	norm for normalize the data.
+	do_not_split if you want all the data in the same set, but shuffled. 
+	"""
 	print('generating sets')
 	if norm:
 		data = bm.normalize(data)
@@ -82,6 +106,8 @@ def generate_sets(data, labels, norm = False, do_not_split = False):
 	return X_train, y_train, X_CV, y_CV, X_test,y_test
 
 def plot_history(history, avoid_loss = True):
+	"""Plots the performance of a training process using the history object that the fit_network function returns.
+	-avoid_loss = if true, avoids plotting the loss function and only prints the evaluation metric used."""
 	metric = ''
 	for element in history.history.keys():
 		if avoid_loss:
@@ -103,6 +129,7 @@ def plot_history(history, avoid_loss = True):
 	plt.show()
 
 def model1_network(input_shape, output_shape):
+	"""One pre-made model that works most of the time."""
 	model_name = 'delete'
 	print('creating NN')
 	model = Sequential()
@@ -114,8 +141,11 @@ def model1_network(input_shape, output_shape):
 	model.add(Dropout(0.2))
 	model.add(Dense(20, activation='relu'))
 	model.add(Dropout(0.2))
-	model.add(Dense(output_shape, activation='sigmoid'))
+	if output_shape > 1:
+		model.add(Dense(output_shape, activation='softmax'))
+	else:
+		model.add(Dense(output_shape, activation='sigmoid'))
 	model.summary()
-	sgd = optimizers.SGD(lr=0.001, momentum=0.9, decay=0.0, nesterov=False) #Default optimizer
+	sgd = optimizers.SGD(lr=0.01, momentum=0.9, decay=0.0, nesterov=False) #Default optimizer
 	model.compile(optimizer = sgd, loss='binary_crossentropy', metrics=['accuracy'])
 	return model
