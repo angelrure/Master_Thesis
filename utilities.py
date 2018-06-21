@@ -195,6 +195,49 @@ def analyze_tissue_pca_similarity(data, labels, pca, tissues):
 	labels = labels[tags.isin(['Breast','Salivary Gland', 'Uterus', 'Vagina', 'Pancreas', 'Spleen'])]
 	analyze_pca_results_labels(data, pca, labels)
 
+def in_silico_screening(model_name, kind_of_model, n_samples, 
+	use_base_instead_of_mutated = False, n_exons_to_use = 2, separate_tissues = False,
+	include_conservation = True, keep_base_sequence = True, include_len = False,
+	include_Tissue = False):
+	"""Performs an in-silico mutation analysis in which a sequence is mutated to check how these 
+	mutations affect the PSI values.
+	-model_name = file to use for making the predictions.
+	-kind_of_model: whether using a classification or regression model.
+	-n_exon_to_use = number of exon to use and plot in the in silico mutation.
+	-separate_tissues: wther to perform the analysis separating the samples by tissue.
+	-include_conservation: whether to use the conservation also in the models.
+	-keep_base_sequence: whether to keep the base sequence in the plots.
+	-include_len: whether to use the len as a variable for the predictions.
+	-include_tissue: whether the model needs the tissue for predictions.
+	"""
+	data = pre_process_data(kind_of_model = 'Classification',n_samples =n_samples, 
+		skip_rows = 0, use_base_instead_of_mutated =  True, compute_kmers = False,
+		include_conservation = include_conservation)
+	if separate_tissues == False:
+		data = data[~data.index.duplicated(keep = 'first')]
+	if include_len == False:
+		data.drop('len', inplace = True, axis = 1, errors = 'ignore')
+	if include_Tissue == False:
+		data.drop('Tissue', inplace = True, axis = 1)
+	modified_sequences = []
+	for index, row in data.iterrows():
+		for position in range(1,481):
+			modified_sequences.append(change_sequence_and_conservation_values(row, position, False, 
+				include_conservation = include_conservation))
+	data = pandas.DataFrame(modified_sequences)
+	data = bm.calculate_kmers(data, keep_base_sequence = keep_base_sequence, 
+		verify_nucleotides = True)
+	model = bm.keras.models.load_model(model_name)
+	X_train, y_train = bm.generate_sets(data, do_not_split = True, avoid_overlap = False, 
+		use_tissues = include_Tissue, using_kmers = True, norm = True, validate_tissues = True, 
+		train_set_size = 0.8, get_output_in_pandas_format = True, filter_by_number = 0)
+	predictions = model.predict(X_train.values)
+	predictions = predictions.reshape(-1, 480)
+	for prediction in predictions:
+		plot_prediction(prediction, 'Norm')
+	plt.show()
+	return predictions
+
 def analyze_tissue_tsne_similarity(data, labels, ignore_tissues = ['Breast','Salivary Gland', 'Uterus', 'Vagina', 'Pancreas', 'Spleen']):
 	"""To study whether the tissues that were worstly predicted present similar
 	splicing patterns.
