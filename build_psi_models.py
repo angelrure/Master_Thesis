@@ -16,7 +16,7 @@ from sklearn.cross_validation import train_test_split
 import keras
 import random
 
-###This code is used to perform several actions and analysis with PSI or gene expression data"""
+"""This code is used to perform several actions and analysis with PSI or gene expression data"""
 
 ## -- Reading and preparaing
 
