@@ -18,7 +18,7 @@ import random
 
 """This code is used to perform several actions and analysis with PSI or gene expression data"""
 
-## -- Reading and preparaing
+## - Reading and preparaing
 
 def read_psis(n_cols = 7000, nrows = 1000, transpose = True, drop_na = True, source = 'GTEX'):
 	print('Reading PSI data')
